@@ -46,14 +46,9 @@ class ImageProcessor:
         else:
             self.mask_image = mask_image
 
-        if device == "cpu":
-            self.face_detector = None
-        else:
-            self.face_detector = FaceDetector(device=device)
+        self.face_detector = FaceDetector(device=device)
 
     def affine_transform(self, image: torch.Tensor) -> np.ndarray:
-        if self.face_detector is None:
-            raise NotImplementedError("Using the CPU for face detection is not supported")
         bbox, landmark_2d_106 = self.face_detector(image)
         if bbox is None:
             raise RuntimeError("Face not detected")
@@ -117,6 +112,6 @@ class VideoProcessor:
 
 
 if __name__ == "__main__":
-    video_processor = VideoProcessor(256, "cuda")
+    video_processor = VideoProcessor(256, "cpu")
     video_frames = video_processor.affine_transform_video("assets/demo2_video.mp4")
     write_video("output.mp4", video_frames, fps=25)

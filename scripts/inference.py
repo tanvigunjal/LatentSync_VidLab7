@@ -30,9 +30,27 @@ def main(config, args):
     if not os.path.exists(args.audio_path):
         raise RuntimeError(f"Audio path '{args.audio_path}' not found")
 
-    # Check if the GPU supports float16
-    is_fp16_supported = torch.cuda.is_available() and torch.cuda.get_device_capability()[0] > 7
-    dtype = torch.float16 if is_fp16_supported else torch.float32
+    # Detect available device: prefer CUDA, then MPS, else CPU
+    if torch.cuda.is_available():
+        # use the current CUDA device index
+        cuda_idx = torch.cuda.current_device()
+        device_str = f"cuda:{cuda_idx}"
+        # check for fp16 support (compute capability >= 7)
+        try:
+            cap = torch.cuda.get_device_capability(cuda_idx)
+            is_fp16_supported = cap[0] >= 7
+        except Exception:
+            is_fp16_supported = False
+        dtype = torch.float16 if is_fp16_supported else torch.float32
+    elif getattr(torch, "has_mps", False) and torch.backends.mps.is_available():
+        device_str = "mps"
+        dtype = torch.float32
+    else:
+        device_str = "cpu"
+        dtype = torch.float32  # Using float32 for better compatibility on CPU
+    device = torch.device(device_str)
+
+    print(f"Using device: {device_str}, dtype: {dtype}")
 
     print(f"Input video path: {args.video_path}")
     print(f"Input audio path: {args.audio_path}")
@@ -49,7 +67,7 @@ def main(config, args):
 
     audio_encoder = Audio2Feature(
         model_path=whisper_model_path,
-        device="cuda",
+        device=device_str,
         num_frames=config.data.num_frames,
         audio_feat_length=config.data.audio_feat_length,
     )
@@ -61,17 +79,24 @@ def main(config, args):
     unet, _ = UNet3DConditionModel.from_pretrained(
         OmegaConf.to_container(config.model),
         args.inference_ckpt_path,
-        device="cpu",
+        device=device_str,
     )
 
-    unet = unet.to(dtype=dtype)
+    # move and cast model parameters
+    try:
+        unet = unet.to(device=device)
+        if dtype == torch.float16:
+            unet = unet.half()
+    except Exception:
+        # Fallback: try moving without dtype cast
+        unet = unet.to(device=device)
 
     pipeline = LipsyncPipeline(
         vae=vae,
         audio_encoder=audio_encoder,
         unet=unet,
         scheduler=scheduler,
-    ).to("cuda")
+    ).to(device)
 
     # use DeepCache
     if args.enable_deepcache:

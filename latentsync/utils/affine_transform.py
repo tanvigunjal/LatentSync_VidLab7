@@ -5,8 +5,6 @@ import cv2
 import torch
 from einops import rearrange
 import kornia
-
-
 class AlignRestore(object):
     def __init__(self, align_points=3, resolution=256, device="cpu", dtype=torch.float16):
         if align_points == 3:
@@ -70,8 +68,25 @@ class AlignRestore(object):
         inv_mask_erosion_t = inv_mask_erosion.squeeze(0).expand_as(inv_face)
         pasted_face = inv_mask_erosion_t * inv_face
         total_face_area = torch.sum(inv_mask_erosion.float())
-        w_edge = int(total_face_area**0.5) // 20
-        erosion_radius = w_edge * 2
+        
+        # Guard against NaN or zero area which can happen if the mask is empty
+        try:
+            area_val = float(total_face_area.item())
+        except Exception:
+            area_val = 0.0
+
+        if not np.isfinite(area_val) or area_val <= 0.0:
+            # Fallback: estimate edge size from image dimensions
+            h_img, w_img = h, w
+            w_edge = max(1, min(h_img, w_img) // 20)
+            print("Warning: computed face area is zero or NaN, using fallback erosion size")
+        else:
+            w_edge = int(area_val**0.5) // 20
+
+        if w_edge < 1:
+            w_edge = 1
+
+        erosion_radius = max(1, w_edge * 2)
 
         # This step will consume a large amount of GPU memory.
         # inv_mask_center = kornia.morphology.erosion(

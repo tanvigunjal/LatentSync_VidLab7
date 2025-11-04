@@ -7,12 +7,26 @@ INSIGHTFACE_DETECT_SIZE = 512
 
 class FaceDetector:
     def __init__(self, device="cuda"):
+        # choose CUDA provider only if device is a CUDA device (e.g. 'cuda:0')
+        is_cuda = False
+        if isinstance(device, str):
+            is_cuda = device.startswith("cuda")
+        else:
+            is_cuda = getattr(device, "type", None) == "cuda"
+        providers = ["CUDAExecutionProvider"] if is_cuda else ["CPUExecutionProvider"]
+    
         self.app = FaceAnalysis(
             allowed_modules=["detection", "landmark_2d_106"],
             root="checkpoints/auxiliary",
-            providers=["CUDAExecutionProvider"],
+            providers=providers,
         )
-        self.app.prepare(ctx_id=cuda_to_int(device), det_size=(INSIGHTFACE_DETECT_SIZE, INSIGHTFACE_DETECT_SIZE))
+       
+        ctx_id = cuda_to_int(device)
+        try:
+            self.app.prepare(ctx_id=ctx_id, det_size=(INSIGHTFACE_DETECT_SIZE, INSIGHTFACE_DETECT_SIZE))
+        except Exception as e:
+            print(f"Warning: Failed to initialize with ctx_id={ctx_id}, trying with ctx_id=-1")
+            self.app.prepare(ctx_id=-1, det_size=(INSIGHTFACE_DETECT_SIZE, INSIGHTFACE_DETECT_SIZE))
 
     def __call__(self, frame, threshold=0.5):
         f_h, f_w, _ = frame.shape
@@ -69,17 +83,18 @@ class FaceDetector:
             return (x1, y1, x2, y2), lmk
 
 
-def cuda_to_int(cuda_str: str) -> int:
+def cuda_to_int(device_str: str) -> int:
     """
-    Convert the string with format "cuda:X" to integer X.
+    Convert a device string ('cpu', 'cuda', 'mps') into a numeric context ID.
+    Returns:
+        -1 for CPU or MPS (non-CUDA)
+         0,1,... for CUDA device indices
     """
-    if cuda_str == "cuda":
-        return 0
-    device = torch.device(cuda_str)
-    if device.type != "cuda":
-        raise ValueError(f"Device type must be 'cuda', got: {device.type}")
-    return device.index
-
+    device_str = device_str.lower()
+    if device_str in ("cpu", "mps"):
+        return -1 
+    device = torch.device(device_str)
+    return device.index if device.type == "cuda" else -1
 
 LMK_ADAPT_ORIGIN_ORDER = [
     1,

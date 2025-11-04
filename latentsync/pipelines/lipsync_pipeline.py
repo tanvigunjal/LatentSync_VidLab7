@@ -339,7 +339,11 @@ class LipsyncPipeline(DiffusionPipeline):
         # 0. Define call parameters
         device = self._execution_device
         mask_image = load_fixed_mask(height, mask_image_path)
-        self.image_processor = ImageProcessor(height, device="cuda", mask_image=mask_image)
+
+        # pass device as a string (e.g. 'cuda:0', 'mps', 'cpu') to ImageProcessor
+        device_str = str(device)
+        self.image_processor = ImageProcessor(height, device=device_str, mask_image=mask_image)
+        
         self.set_progress_bar_config(desc=f"Sample frames: {num_frames}")
 
         # 1. Default height and width to unet
