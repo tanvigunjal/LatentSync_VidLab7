@@ -113,16 +113,22 @@ def read_audio(audio_path: str, audio_sample_rate: int = 16000):
 
 
 def write_video(video_output_path: str, video_frames: np.ndarray, fps: int):
-    with imageio.get_writer(
-        video_output_path,
-        fps=fps,
-        codec="libx264",
-        macro_block_size=None,
-        ffmpeg_params=["-crf", "13"],
-        ffmpeg_log_level="error",
-    ) as writer:
-        for video_frame in video_frames:
-            writer.append_data(video_frame)
+    # Try to use the ffmpeg plugin explicitly to avoid imageio selecting an incorrect writer
+    try:
+        with imageio.get_writer(
+            video_output_path,
+            fps=fps,
+            codec="libx264",
+            macro_block_size=None,
+            ffmpeg_params=["-crf", "13"],
+            ffmpeg_log_level="error",
+            plugin="ffmpeg",
+        ) as writer:
+            for video_frame in video_frames:
+                writer.append_data(video_frame)
+    except Exception:
+        # Fallback to OpenCV writer if imageio/ffmpeg is not available or fails
+        write_video_cv2(video_output_path, video_frames, fps)
 
 
 def write_video_cv2(video_output_path: str, video_frames: np.ndarray, fps: int):
