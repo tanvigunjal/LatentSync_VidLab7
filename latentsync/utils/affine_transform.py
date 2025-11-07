@@ -134,7 +134,18 @@ class AlignRestore(object):
         points2_normalized = points2_centered / s2
 
         covariance = torch.matmul(points1_normalized.T, points2_normalized)
-        U, S, V = torch.svd(covariance.float())
+        
+        # Handle SVD for MPS device
+        if covariance.device.type == "mps":
+            with torch.no_grad():
+                cpu_covariance = covariance.float().cpu()
+                U, S, V = torch.linalg.svd(cpu_covariance)
+                U = U.to("mps")
+                S = S.to("mps")
+                V = V.transpose(-2, -1).to("mps")
+        else:
+            U, S, V = torch.linalg.svd(covariance.float())
+            V = V.transpose(-2, -1)  # Convert V to match torch.svd output format
 
         R = torch.matmul(V, U.T)
 
