@@ -296,7 +296,7 @@ def main(config, args):
         with torch.no_grad():
             _clear_memory(aggressive=True)
             # Multiple small warmup runs
-            for i in range(2):
+            for i in range(1):
                 warmup_output = os.path.join(warmup_dir, f"warmup_{i}.mp4")
                 try:
                     pipeline(

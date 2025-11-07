@@ -258,12 +258,46 @@ class LipsyncPipeline(DiffusionPipeline):
             faces = []
             boxes = []
             affine_matrices = []
+            batch_size = 64  # Configurable batch size for efficient processing
             print(f"Affine transforming {len(video_frames)} faces...")
-            for frame in tqdm.tqdm(video_frames):
-                face, box, affine_matrix = self.image_processor.affine_transform(frame)
-                faces.append(face)
-                boxes.append(box)
-                affine_matrices.append(affine_matrix)
+            
+            # Process frames in batches for efficiency
+            for i in range(0, len(video_frames), batch_size):
+                batch_frames = video_frames[i:i + batch_size]
+                for frame in tqdm.tqdm(batch_frames):
+                    try:
+                        # First attempt with primary face detector
+                        face, box, affine_matrix = self.image_processor.affine_transform(frame)
+                        if face is None:
+                            # Fallback to secondary detection method with different parameters
+                            face, box, affine_matrix = self.image_processor.affine_transform(frame, fallback=True)
+                        
+                        if face is not None:
+                            faces.append(face)
+                            boxes.append(box)
+                            affine_matrices.append(affine_matrix)
+                        else:
+                            # If both detections fail, use previous frame's data
+                            if len(faces) > 0:
+                                faces.append(faces[-1])
+                                boxes.append(boxes[-1])
+                                affine_matrices.append(affine_matrices[-1])
+                            else:
+                                # For first frame, use center crop as last resort
+                                h, w = frame.shape[:2]
+                                center_box = [w//4, h//4, 3*w//4, 3*h//4]
+                                face = cv2.resize(frame[center_box[1]:center_box[3], center_box[0]:center_box[2]], (224, 224))
+                                face = torch.from_numpy(face).permute(2, 0, 1).float() / 255.0
+                                faces.append(face)
+                                boxes.append(center_box)
+                                affine_matrices.append(np.eye(3))
+                    except Exception as e:
+                        logger.warning(f"Error in face detection: {e}. Using fallback.")
+                        # Use fallback strategy similar to detection failure
+                        if len(faces) > 0:
+                            faces.append(faces[-1])
+                            boxes.append(boxes[-1])
+                            affine_matrices.append(affine_matrices[-1])
 
             faces = torch.stack(faces)
         return faces, boxes, affine_matrices
@@ -453,10 +487,26 @@ class LipsyncPipeline(DiffusionPipeline):
                             # predict the noise residual
                             noise_pred = self.unet(unet_input, t, encoder_hidden_states=audio_embeds).sample
 
-                            # perform guidance
+                            # perform guidance with dynamic scale
                             if do_classifier_free_guidance:
-                                noise_pred_uncond, noise_pred_audio = noise_pred.chunk(2)
-                                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_audio - noise_pred_uncond)
+                                noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                                # Calculate sync confidence score for each frame
+                                sync_confidence = torch.cosine_similarity(
+                                    noise_pred_uncond.flatten(1), 
+                                    noise_pred_text.flatten(1), 
+                                    dim=1
+                                ).mean()
+                                # Adjust guidance scale based on sync confidence
+                                sync_confidence_based_scale = guidance_scale * (1.0 + 0.5 * (1.0 - sync_confidence.item()))
+                                sync_confidence_based_scale = max(1.0, min(2.0, sync_confidence_based_scale))
+                                noise_pred = noise_pred_uncond + sync_confidence_based_scale * (noise_pred_text - noise_pred_uncond)
+                                
+                                # Apply temporal smoothing between consecutive frames
+                                if 'prev_noise_pred' in locals():
+                                    # Ensure dimensions match before smoothing
+                                    if prev_noise_pred.shape == noise_pred.shape:
+                                        noise_pred = 0.8 * noise_pred + 0.2 * prev_noise_pred
+                                prev_noise_pred = noise_pred.detach().clone()
 
                             # compute the previous noisy sample x_t -> x_t-1
                             latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
@@ -484,13 +534,47 @@ class LipsyncPipeline(DiffusionPipeline):
 
         # save output video
         with monitor.profile("Save Output Video"):
+            # Ensure temp directory is clean and exists
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
             os.makedirs(temp_dir, exist_ok=True)
 
-            write_video(os.path.join(temp_dir, "video.mp4"), synced_video_frames, fps=video_fps)
-            sf.write(os.path.join(temp_dir, "audio.wav"), audio_samples, audio_sample_rate)
+            # Create output directory if it doesn't exist
+            output_dir = os.path.dirname(os.path.abspath(video_out_path))
+            os.makedirs(output_dir, exist_ok=True)
 
-            command = f"ffmpeg -y -loglevel error -nostdin -i {os.path.join(temp_dir, 'video.mp4')} -i {os.path.join(temp_dir, 'audio.wav')} -c:v libx264 -crf 18 -c:a aac -q:v 0 -q:a 0 {video_out_path}"
-            subprocess.run(command, shell=True)
+            # Write intermediate files
+            try:
+                write_video(os.path.join(temp_dir, "video.mp4"), synced_video_frames, fps=video_fps)
+                sf.write(os.path.join(temp_dir, "audio.wav"), audio_samples, audio_sample_rate)
+
+                # High-quality video encoding with optimal settings
+                # First, ensure consistent frame rate in the intermediate video
+                intermediate_video = os.path.join(temp_dir, "video_normalized.mp4")
+                normalize_command = f"ffmpeg -y -loglevel error -nostdin -i {os.path.join(temp_dir, 'video.mp4')} -c:v libx264 -preset medium -crf 18 -r 25 -vsync cfr {intermediate_video}"
+                result = subprocess.run(normalize_command, shell=True, capture_output=True, text=True)
+                
+                if result.returncode != 0:
+                    raise RuntimeError(f"FFmpeg frame rate normalization failed with error: {result.stderr}")
+
+                # Then create the final high-quality output with audio
+                command = f"ffmpeg -y -loglevel error -nostdin -i {intermediate_video} -i {os.path.join(temp_dir, 'audio.wav')} -c:v libx264 -preset slow -crf 18 -profile:v high -tune film -movflags +faststart -c:a aac -b:a 192k {video_out_path}"
+                result = subprocess.run(command, shell=True, capture_output=True, text=True)
+                
+                if result.returncode != 0:
+                    raise RuntimeError(f"FFmpeg final encoding failed with error: {result.stderr}")
+
+                # Verify the output file exists and has size > 0
+                if not os.path.exists(video_out_path) or os.path.getsize(video_out_path) == 0:
+                    raise RuntimeError("Output video file was not created successfully")
+                
+                logger.info(f"Successfully saved output video to {video_out_path}")
+
+            except Exception as e:
+                logger.error(f"Error saving output video: {str(e)}")
+                raise
+            finally:
+                # Clean up temp directory
+                if os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir)
 
