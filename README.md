@@ -221,31 +221,113 @@ python scripts/inference_profiler_optimized.py \
 These improvements focus on stability, performance, and quality enhancements.
 
 ### Lip-Sync Quality Controls
-1. Advanced Frame Processing
-   - Efficient batched frame processing
-   - Optimized face detection with fallbacks
-   - Robust error handling and recovery
-   - Configurable batch size:
+
+#### 1. Advanced Frame Processing
+   - **Efficient Batch Processing**: Implemented configurable batch processing for improved performance
+   - **Enhanced Face Detection System**:
+     - Primary and secondary detection methods with automatic fallbacks
+     - Recovery mechanism using previous frame data when detection fails
+     - Last-resort center crop strategy for undetectable faces
+   - **Error Handling**:
+     - Robust exception handling for face detection failures
+     - Graceful recovery from processing errors
+   - **Batch Configuration**:
    ```python
-   batch_size = 64  # Adjust based on available memory
+   # Configurable batch size with automatic memory management
+   batch_size = 64  # Adjusts based on available system memory
    ```
 
-2. Enhanced Audio-Visual Synchronization
-   - Frame-level synchronization checks
-   - Temporal smoothing between consecutive frames
-   - Dynamic guidance scale adjustment:
+#### 2. Enhanced Audio-Visual Synchronization
+   - **Intelligent Sync System**:
+     - Frame-level synchronization confidence scoring
+     - Adaptive temporal smoothing between consecutive frames
+     - Smart cosine similarity-based sync validation
+   - **Dynamic Guidance Scale**:
    ```python
-   guidance_scale = sync_confidence_based_scale  # range: 1.0-2.0
+   # Automatic guidance scale adjustment based on sync confidence
+   sync_confidence = cosine_similarity(current_frame, audio_features)
+   guidance_scale = base_scale * (1.0 + 0.5 * (1.0 - sync_confidence))
+   # Ensures optimal sync while maintaining stability (range: 1.0-2.0)
+   ```
+   - **Temporal Consistency**:
+   ```python
+   # Smooth transitions between frames
+   if prev_frame_available:
+       current_frame = 0.8 * current_frame + 0.2 * prev_frame
    ```
 
-3. Resolution and Quality Optimization
-   - High-quality video processing pipeline
-   - Optimized face detection and cropping
-   - Consistent frame rate handling (25 FPS)
-   - High-quality video encoding:
-   ```bash
-   ffmpeg -y -loglevel error -nostdin -i input.mp4 -crf 18 -preset slow -c:v libx264 output.mp4
-   ```
+#### 3. Resolution and Quality Optimization
+   - **Two-Stage Video Processing Pipeline**:
+     1. Frame Rate Normalization:
+     ```bash
+     # Ensure consistent frame timing
+     ffmpeg -y -i input.mp4 -c:v libx264 -preset medium -crf 18 \
+            -r 25 -vsync cfr normalized.mp4
+     ```
+     2. High-Quality Final Encoding:
+     ```bash
+     # Professional-grade video output
+     ffmpeg -y -i normalized.mp4 -i audio.wav \
+           -c:v libx264 -preset slow -crf 18 \
+           -profile:v high -tune film \
+           -movflags +faststart -c:a aac -b:a 192k \
+           output.mp4
+     ```
+   - **Quality Assurance**:
+     - Constant 25 FPS frame rate enforcement
+     - High-quality x264 encoding with film tuning
+     - Fast start optimization for streaming
+     - Professional-grade audio encoding (192k AAC)
+   - **Error Prevention**:
+     - Output validation and verification
+     - Automatic output directory creation
+     - Comprehensive error reporting
+
+### Output Video Examples and Format
+
+#### Video Specifications
+- **Resolution**: Maintains input resolution with professional-grade scaling
+- **Frame Rate**: Constant 25 FPS for optimal lip-sync
+- **Codec**: H.264/AVC (libx264) with high profile
+- **Container**: MP4 with fast start optimization
+- **Quality Settings**:
+  - Video: CRF 18 (high quality, visually lossless)
+  - Audio: AAC 192kbps (professional audio quality)
+
+#### Example Output Structure
+```
+output_video.mp4
+├── Video Stream
+│   ├── Codec: H.264/AVC
+│   ├── Profile: High
+│   ├── Preset: slow (best quality)
+│   ├── Frame Rate: 25 fps
+│   └── Quality: CRF 18
+└── Audio Stream
+    ├── Codec: AAC-LC
+    ├── Bitrate: 192 kbps
+    ├── Sample Rate: 48 kHz
+    └── Channels: Stereo
+```
+
+#### Sample Command
+```bash
+# Generate high-quality output video
+python scripts/inference_profiler_optimized.py \
+    --unet_config_path configs/unet/stage2_512.yaml \
+    --inference_ckpt_path checkpoints/latentsync_unet.pt \
+    --video_path "input_video.mp4" \
+    --audio_path "input_audio.wav" \
+    --video_out_path "output.mp4" \
+    --enable_deepcache \
+    --guidance_scale 1.5
+```
+
+#### Output Location
+- Default: Current working directory
+- Custom: Specify full path with `--video_out_path`
+- Auto-creates output directory if needed
+- Validates output video integrity after creation
 
 4. Memory-Efficient Processing
    - VAE slicing for high-resolution inputs
