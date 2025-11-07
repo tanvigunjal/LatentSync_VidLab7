@@ -320,13 +320,13 @@ Key pipeline stages and their performance metrics:
 ### Performance Visualizations
 
 #### Memory Usage Profile
-![Memory Usage Profile](performance_metrics_improved/memory_usage.png)
+![Memory Usage Profile](images/memory_usage.png)
 
 #### Processing Time Distribution
-![Time Distribution](performance_metrics_improved/time_distribution.png)
+![Time Distribution](images/time_distribution.png)
 
 #### Performance Comparison
-![Time Comparison](performance_metrics_improved/time_comparison.png)
+![Time Comparison](images/time_comparison.png)
 
 ### Key Improvements
 
