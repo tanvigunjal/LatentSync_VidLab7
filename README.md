@@ -1,11 +1,5 @@
 # LatentSync: High-Performance Audio-Visual Synchronization Pipeline
 
-[![Python Version](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue)]()
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-red)]()
-[![License](https://img.shields.io/badge/license-MIT-green)]()
-
-LatentSync is a high-performance pipeline for audio-visual synchronization, optimized for Apple Silicon and NVIDIA GPUs. It provides state-of-the-art lip-sync quality with optimized inference performance.
-
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -35,15 +29,13 @@ python scripts/inference_profiler_optimized.py \
 
 ## 🛠 Features
 
-- **High-Quality Lip Sync**: State-of-the-art synchronization using advanced neural networks
+- **High-Quality Lip Sync**: Synchronization using advanced neural networks
 - **Optimized Performance**: Efficient processing on both Apple Silicon and NVIDIA GPUs
 - **Memory Efficient**: Smart caching and batch processing for reduced memory footprint
 - **Robust Processing**: Advanced error handling and recovery mechanisms
 - **Quality Controls**: Comprehensive sync quality monitoring and validation
 
-## ⚡️ Performance Optimizations
-
-> 🔄 **Latest Optimizations**: Major improvements in performance, stability, and memory usage.
+## Performance Optimizations
 
 ### MacBook-Specific Optimizations (MPS)
 1. Enhanced MPS Support
@@ -210,9 +202,8 @@ python scripts/inference_profiler_optimized.py \
 | `--profile` | Enable performance profiling | False | As needed |
 | `--profile_memory` | Track memory usage | False | As needed |
 
-## 💫 Quality Optimizations
+## Quality Optimizations
 
-### Latest Improvements (v1.6)
 - Enhanced face detection with robust fallbacks
 - Improved audio-visual sync confidence evaluation
 - Better temporal consistency in lip movements
@@ -285,6 +276,15 @@ These improvements focus on stability, performance, and quality enhancements.
 
 ### Output Video Examples and Format
 
+#### Example Output
+Check out our sample output video: [video_out.mp4](video_out.mp4)
+
+This video demonstrates:
+- Perfect lip synchronization with audio
+- High-quality face reconstruction
+- Smooth temporal transitions
+- Professional-grade output encoding
+
 #### Video Specifications
 - **Resolution**: Maintains input resolution with professional-grade scaling
 - **Frame Rate**: Constant 25 FPS for optimal lip-sync
@@ -294,21 +294,6 @@ These improvements focus on stability, performance, and quality enhancements.
   - Video: CRF 18 (high quality, visually lossless)
   - Audio: AAC 192kbps (professional audio quality)
 
-#### Example Output Structure
-```
-output_video.mp4
-├── Video Stream
-│   ├── Codec: H.264/AVC
-│   ├── Profile: High
-│   ├── Preset: slow (best quality)
-│   ├── Frame Rate: 25 fps
-│   └── Quality: CRF 18
-└── Audio Stream
-    ├── Codec: AAC-LC
-    ├── Bitrate: 192 kbps
-    ├── Sample Rate: 48 kHz
-    └── Channels: Stereo
-```
 
 #### Sample Command
 ```bash
@@ -372,21 +357,8 @@ python scripts/inference_profiler_optimized.py \
    Solution: Check face detection settings and audio FPS
    ```
 
-### Performance Tips
-- Clear GPU cache periodically
-- Monitor sync confidence scores
-- Use appropriate batch sizes
-- Enable progress tracking for long jobs
 
 ## 📊 Performance Analysis
-
-### Hardware Benchmarks
-
-| Hardware | Batch Size | FPS | Memory Usage |
-|----------|------------|-----|--------------|
-| M1 Pro | 64 | 25-30 | ~8GB |
-| M1 Max | 128 | 35-40 | ~12GB |
-| RTX 3080 | 256 | 45-50 | ~10GB |
 
 ### Stage-wise Performance
 
@@ -423,21 +395,3 @@ Key pipeline stages and their performance metrics:
    - Reduced pipeline stalls
    - Better error recovery
    - Improved sync consistency
-
-## 📜 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-## 📫 Support
-
-For issues and feature requests, please use the [GitHub Issues](https://github.com/tanvigunjal/LatentSync_VidLab7/issues) page.
-
-## 🙏 Acknowledgments
-
-- Original SyncNet implementation
-- Contributors to the optimization efforts
-- PyTorch team for MPS support
