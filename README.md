@@ -277,13 +277,23 @@ These improvements focus on stability, performance, and quality enhancements.
 ### Output Video Examples and Format
 
 #### Example Output
-Check out our sample output video: [video_out.mp4](video_out.mp4)
+
+https://github.com/tanvigunjal/LatentSync_VidLab7/assets/video_out.mp4
 
 This video demonstrates:
 - Perfect lip synchronization with audio
 - High-quality face reconstruction
 - Smooth temporal transitions
 - Professional-grade output encoding
+
+<details>
+<summary>📝 Video Details</summary>
+
+If the video doesn't play directly:
+- View the [raw video file](video_out.mp4)
+- Check the [releases page](../../releases) for sample outputs
+- View on [GitHub Pages](https://tanvigunjal.github.io/LatentSync_VidLab7/video_out.mp4)
+</details>
 
 #### Video Specifications
 - **Resolution**: Maintains input resolution with professional-grade scaling
