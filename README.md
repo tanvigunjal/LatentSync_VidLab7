@@ -1,208 +1,18 @@
 # LatentSync: High-Performance Audio-Visual Synchronization Pipeline
 
-## 🚀 Quick Start
+> **Note**: This implementation focuses primarily on Apple Silicon (M3) optimizations using Metal Performance Shaders (MPS). While the codebase includes references to NVIDIA GPU support, all optimizations and performance testing were conducted exclusively on Mac MPS hardware, as no NVIDIA GPUs were available during development.
 
-### Prerequisites
-```bash
-# Clone the repository
-git clone https://github.com/tanvigunjal/LatentSync_VidLab7.git
-cd LatentSync_VidLab7
+## Features
 
-# Set up Python environment
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### Basic Usage
-```bash
-python scripts/inference_profiler_optimized.py \
-    --unet_config_path configs/unet/stage2_512.yaml \
-    --inference_ckpt_path checkpoints/latentsync_unet.pt \
-    --video_path "input_video.mp4" \
-    --audio_path "input_audio.wav" \
-    --video_out_path "output.mp4" \
-    --enable_deepcache
-```
-
-## 🛠 Features
-
-- **High-Quality Lip Sync**: Synchronization using advanced neural networks
+- **High-Quality Lip Sync**: State-of-the-art synchronization using UNet3D-based latent diffusion models with advanced audio-visual alignment
 - **Optimized Performance**: Efficient processing on both Apple Silicon and NVIDIA GPUs
 - **Memory Efficient**: Smart caching and batch processing for reduced memory footprint
 - **Robust Processing**: Advanced error handling and recovery mechanisms
 - **Quality Controls**: Comprehensive sync quality monitoring and validation
 
-## Performance Optimizations
+# Optimizations
 
-### MacBook-Specific Optimizations (MPS)
-1. Enhanced MPS Support
-   - Improved Metal Performance Shaders (MPS) utilization
-   - Optimized tensor operations for Apple Silicon
-   - Custom SVD implementation for MPS compatibility
-   ```python
-   # SVD optimization for MPS devices
-   if tensor.device.type == "mps":
-       with torch.no_grad():
-           cpu_tensor = tensor.cpu()
-           U, S, V = torch.linalg.svd(cpu_tensor)
-           return U.to("mps"), S.to("mps"), V.transpose(-2, -1).to("mps")
-   ```
-
-2. Memory Management
-   - Aggressive memory clearing
-   - Dynamic cache management
-   - Optimized tensor format conversions
-   ```python
-   def _clear_memory(aggressive=False):
-       gc.collect()
-       if torch.backends.mps.is_available():
-           torch.mps.empty_cache()
-           if aggressive:
-               dummy = torch.ones(1, device="mps")
-               dummy.item()
-   ```
-
-### Model Optimizations
-1. Model Loading and Initialization
-   - Efficient model placement on device
-   - Optimized weight format for inference
-   - Selective channels_last memory format
-   ```python
-   # Selective channels_last optimization
-   if isinstance(module, nn.Conv2d) and len(module.weight.shape) == 4:
-       module.weight.data = module.weight.data.to(memory_format=torch.channels_last)
-   ```
-
-2. Pipeline Enhancements
-   - Parallel audio processing
-   - Optimized warmup strategy
-   - Efficient batch processing
-   ```python
-   # Parallel audio processing
-   def process_audio_parallel(audio_encoder, audio_path, num_frames, audio_feat_length):
-       with ThreadPoolExecutor(max_workers=1) as executor:
-           future = executor.submit(process_chunk)
-           return future.result()
-   ```
-
-### Cache and Storage Optimizations
-1. VAE Output Caching
-   - LRU cache implementation
-   - Memory-aware cache clearing
-   ```python
-   @lru_cache(maxsize=CACHE_SIZE)
-   def cache_vae_output(input_tensor_key, vae):
-       input_tensor = torch.from_numpy(np.frombuffer(input_tensor_key, dtype=np.float32))
-       with torch.no_grad():
-           return vae(input_tensor)
-   ```
-
-2. File Management
-   - Efficient temporary file handling
-   - Automatic cleanup procedures
-   ```python
-   # Temporary directory management
-   warmup_dir = os.path.join(args.temp_dir, "warmup")
-   os.makedirs(warmup_dir, exist_ok=True)
-   ```
-
-### Performance Monitoring
-1. Resource Tracking
-   - Memory usage monitoring
-   - Device utilization tracking
-   - Performance metrics collection
-
-2. Profiling Support
-   - Detailed timing information
-   - Memory allocation tracking
-   - Operation-level profiling
-
-## Usage
-
-### Basic Inference
-```bash
-python scripts/inference_profiler_optimized.py \
-    --unet_config_path configs/unet.yaml \
-    --inference_ckpt_path <checkpoint_path> \
-    --video_path <input_video> \
-    --audio_path <input_audio> \
-    --video_out_path <output_path> \
-    --enable_deepcache
-```
-
-### Performance Monitoring
-```bash
-python scripts/inference_profiler_optimized.py \
-    --profile \
-    --num_profile_runs 3 \
-    [other args as above]
-```
-
-## Requirements
-- PyTorch with MPS support
-- psutil (for memory monitoring)
-- Required Python packages in requirements.txt
-
-## Best Practices
-1. Memory Management
-   - Clear memory between inference runs
-   - Monitor memory usage for large batches
-   - Use appropriate batch sizes for your device
-
-2. Model Configuration
-   - Use fp16 where available
-   - Enable DeepCache for repeated frames
-   - Optimize model loading for your hardware
-
-3. Pipeline Usage
-   - Implement proper warmup
-   - Monitor performance metrics
-   - Clean up temporary files
-
-## Performance Impact
-- Reduced memory usage
-- Improved inference speed on MPS devices
-- Better hardware utilization
-- Efficient resource management
-
-## Troubleshooting
-- Monitor system resources during inference
-- Check temporary directory permissions
-- Verify model compatibility with optimizations
-- Ensure proper cleanup after inference
-
-## 🎯 Advanced Configuration
-
-### Performance Tuning
-
-```bash
-# Enable profiling and memory monitoring
-python scripts/inference_profiler_optimized.py \
-    --unet_config_path configs/unet/stage2_512.yaml \
-    --inference_ckpt_path checkpoints/latentsync_unet.pt \
-    --video_path "input.mp4" \
-    --audio_path "audio.wav" \
-    --video_out_path "output.mp4" \
-    --inference_steps 10 \
-    --enable_deepcache \
-    --num_profile_runs 2 \
-    --profile \
-    --profile_memory
-```
-
-### Configuration Options
-| Parameter | Description | Default | Recommended |
-|-----------|-------------|---------|-------------|
-| `--batch_size` | Batch size for processing | 64 | 32-128 |
-| `--inference_steps` | Number of inference steps | 20 | 10-20 |
-| `--enable_deepcache` | Enable DeepCache for faster inference | False | True |
-| `--profile` | Enable performance profiling | False | As needed |
-| `--profile_memory` | Track memory usage | False | As needed |
-
-## Quality Optimizations
+## 1. Quality Optimizations
 
 - Enhanced face detection with robust fallbacks
 - Improved audio-visual sync confidence evaluation
@@ -274,86 +84,139 @@ These improvements focus on stability, performance, and quality enhancements.
      - Automatic output directory creation
      - Comprehensive error reporting
 
-### Output Video Examples and Format
 
-#### Example Output
+## 2. Performance Optimizations
 
-You can find sample output videos in the following paths:
-Output sample: `/video_out.mp4`
-
-This video demonstrates:
-- Perfect lip synchronization with audio
-- High-quality face reconstruction
-- Smooth temporal transitions
-- Professional-grade output encoding
-
-
-#### Sample Command
-```bash
-# Generate high-quality output video
-python scripts/inference_profiler_optimized.py \
-    --unet_config_path configs/unet/stage2_512.yaml \
-    --inference_ckpt_path checkpoints/latentsync_unet.pt \
-    --video_path "input_video.mp4" \
-    --audio_path "input_audio.wav" \
-    --video_out_path "output.mp4" \
-    --enable_deepcache \
-    --guidance_scale 1.5
-```
-
-#### Output Location
-- Default: Current working directory
-- Custom: Specify full path with `--video_out_path`
-- Auto-creates output directory if needed
-- Validates output video integrity after creation
-
-4. Memory-Efficient Processing
-   - VAE slicing for high-resolution inputs
-   - DeepCache for temporal consistency
-   - Gradient checkpointing support
-   - Enable optimizations:
+### 2.1 MacBook-Specific Optimizations (MPS)
+1. Enhanced MPS Support
+   - Improved Metal Performance Shaders (MPS) utilization
+   - Optimized tensor operations for Apple Silicon
+   - Custom SVD implementation for MPS compatibility
    ```python
-   pipeline.enable_vae_slicing()  # for higher resolution
-   --enable_deepcache  # via command line
+   # SVD optimization for MPS devices
+   if tensor.device.type == "mps":
+       with torch.no_grad():
+           cpu_tensor = tensor.cpu()
+           U, S, V = torch.linalg.svd(cpu_tensor)
+
+2. Memory Management
+   - Aggressive memory clearing
+   - Dynamic cache management
+   - Optimized tensor format conversions
+   ```python
+   def _clear_memory(aggressive=False):
+       gc.collect()
+       if torch.backends.mps.is_available():
+           torch.mps.empty_cache()
+           if aggressive:
+               dummy = torch.ones(1, device="mps")
+               dummy.item()
    ```
 
-## 🔧 Hardware Requirements
-
-### Minimum Requirements
-- CPU: 4+ cores
-- RAM: 16GB
-- GPU: NVIDIA GPU with 6GB VRAM or Apple Silicon
-- Storage: 5GB free space
-
-### Recommended Specifications
-- CPU: 8+ cores
-- RAM: 32GB
-- GPU: NVIDIA GPU with 8GB+ VRAM or Apple M1 Pro/Max/Ultra
-- Storage: 10GB+ SSD
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-1. **Memory Errors**
-   ```
-   Solution: Reduce batch_size or enable_vae_slicing
+### 2.2 Advanced Profiling System
+1. Comprehensive Performance Monitoring
+   - Integrated cProfile and PyTorch Profiler
+   - Stage-by-stage execution time tracking
+   - Memory usage monitoring across pipeline stages
+   ```python
+   # Enable profiling with various options
+   --profile            # Enable comprehensive profiling
+   --num_profile_runs   # Set number of profiling iterations
+   --profile_memory     # Enable detailed memory tracking
+   --with_stack        # Enable stack trace analysis
    ```
 
-2. **GPU Out of Memory**
-   ```
-   Solution: Enable DeepCache and adjust inference_steps
+2. Performance Metrics Collection
+   - Detailed timing breakdown for each pipeline stage
+   - Peak memory usage tracking per operation
+   - CPU and GPU utilization monitoring
+   - Automated metrics aggregation and reporting
+
+3. Profiling Output
+   - JSON-formatted performance reports
+   - Stage-wise execution breakdown
+   - Memory consumption patterns
+   - CPU/GPU utilization statistics
+   ```json
+   {
+     "cProfile": {
+       "description": "cProfile results sorted by cumulative time",
+       "stats": "..."
+     },
+     "torch_profiler": {
+       "cpu_time": "...",
+       "cuda_time": "..." // If GPU available
+     }
+   }
    ```
 
-3. **Pipeline Stalls**
+4. Performance Analysis Tools
+   - TensorBoard integration for visualization
+   - Automated performance summary generation
+   - Cross-run comparison capabilities
+   - Memory leak detection and analysis
+   
+
+### 2.3 Model Optimizations
+1. Model Loading and Initialization
+   - Efficient model placement on device
+   - Optimized weight format for inference
+   - Selective channels_last memory format
+   ```python
+   # Selective channels_last optimization
+   if isinstance(module, nn.Conv2d) and len(module.weight.shape) == 4:
+       module.weight.data = module.weight.data.to(memory_format=torch.channels_last)
    ```
-   Solution: Check face detection settings and audio FPS
+
+2. Pipeline Enhancements
+   - Parallel audio processing
+   - Optimized warmup strategy
+   - Efficient batch processing
+   ```python
+   # Parallel audio processing
+   def process_audio_parallel(audio_encoder, audio_path, num_frames, audio_feat_length):
+       with ThreadPoolExecutor(max_workers=4) as executor:
+           future = executor.submit(process_chunk)
+           return future.result()
    ```
 
+### 2.4 Cache and Storage Optimizations
+1. VAE Output Caching
+   - LRU cache implementation
+   - Memory-aware cache clearing
+   ```python
+   @lru_cache(maxsize=CACHE_SIZE)
+   def cache_vae_output(input_tensor_key, vae):
+       input_tensor = torch.from_numpy(np.frombuffer(input_tensor_key, dtype=np.float32))
+       with torch.no_grad():
+           return vae(input_tensor)
+   ```
 
-## 📊 Performance Analysis
+2. File Management
+   - Efficient temporary file handling
+   - Automatic cleanup procedures
+   ```python
+   # Temporary directory management
+   warmup_dir = os.path.join(args.temp_dir, "warmup")
+   os.makedirs(warmup_dir, exist_ok=True)
+   ```
 
-### Stage-wise Performance
+### 2.4 Performance Monitoring
+1. Resource Tracking
+   - Memory usage monitoring
+   - Device utilization tracking
+   - Performance metrics collection
+
+2. Profiling Support
+   - Detailed timing information
+   - Memory allocation tracking
+   - Operation-level profiling
+
+
+
+## 3. Performance Analysis
+
+### 3.1 Stage-wise Performance
 
 Key pipeline stages and their performance metrics:
 
@@ -364,7 +227,7 @@ Key pipeline stages and their performance metrics:
 | Video Transform | 6.40 | 1337 |
 | Inference | ~2.5 | 1490 |
 
-### Performance Visualizations
+### 3.2 Performance Visualizations
 
 #### Memory Usage Profile
 ![Memory Usage Profile](images/memory_usage.png)
@@ -372,7 +235,7 @@ Key pipeline stages and their performance metrics:
 #### Performance Comparison
 ![Time Comparison](images/time_comparison.png)
 
-### Key Improvements
+### 3.3 Key Improvements
 
 1. **Memory Efficiency**
    - Peak memory usage reduced by ~25%
@@ -388,3 +251,97 @@ Key pipeline stages and their performance metrics:
    - Reduced pipeline stalls
    - Better error recovery
    - Improved sync consistency
+
+
+
+## Quick Start
+
+### Prerequisites
+```bash
+# Clone the repository
+git clone https://github.com/tanvigunjal/LatentSync_VidLab7.git
+cd LatentSync_VidLab7
+
+# Set up Python environment
+python -m venv venv
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+
+## Usage
+
+### Basic Usage
+```bash
+python scripts/inference_profiler_optimized.py \
+    --unet_config_path configs/unet/stage2_512.yaml \
+    --inference_ckpt_path checkpoints/latentsync_unet.pt \
+    --video_path "input_video.mp4" \
+    --audio_path "input_audio.wav" \
+    --video_out_path "output.mp4" \
+    --enable_deepcache
+```
+
+### Performance Monitoring
+```bash
+python scripts/inference_profiler_optimized.py \
+    --profile \
+    --num_profile_runs 3 \
+    [other args as above]
+```
+
+## Requirements
+- PyTorch with MPS support
+- psutil (for memory monitoring)
+- Required Python packages in requirements.txt
+
+## Best Practices
+1. Memory Management
+   - Clear memory between inference runs
+   - Monitor memory usage for large batches
+   - Use appropriate batch sizes for your device
+
+2. Model Configuration
+   - Use fp16 where available
+   - Enable DeepCache for repeated frames
+   - Optimize model loading for your hardware
+
+3. Pipeline Usage
+   - Implement proper warmup
+   - Monitor performance metrics
+   - Clean up temporary files
+
+
+## Advanced Configuration
+
+### Performance Tuning
+
+```bash
+# Enable profiling and memory monitoring
+python scripts/inference_profiler_optimized.py \
+    --unet_config_path configs/unet/stage2_512.yaml \
+    --inference_ckpt_path checkpoints/latentsync_unet.pt \
+    --video_path "input.mp4" \
+    --audio_path "audio.wav" \
+    --video_out_path "output.mp4" \
+    --inference_steps 10 \
+    --enable_deepcache \
+    --num_profile_runs 2 \
+    --profile \
+    --profile_memory
+```
+
+### Configuration Options
+| Parameter | Description | Default | Recommended |
+|-----------|-------------|---------|-------------|
+| `--batch_size` | Batch size for processing | 64 | 32-128 |
+| `--inference_steps` | Number of inference steps | 20 | 10-20 |
+| `--enable_deepcache` | Enable DeepCache for faster inference | False | True |
+| `--profile` | Enable performance profiling | False | As needed |
+| `--profile_memory` | Track memory usage | False | As needed |
+
+### Output Video Examples 
+You can find sample output videos in the following paths:
+Output sample: `/video_out.mp4`
