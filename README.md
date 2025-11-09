@@ -278,31 +278,14 @@ These improvements focus on stability, performance, and quality enhancements.
 
 #### Example Output
 
-https://github.com/tanvigunjal/LatentSync_VidLab7/assets/video_out.mp4
+You can find sample output videos in the following paths:
+Output sample: `/video_out.mp4`
 
 This video demonstrates:
 - Perfect lip synchronization with audio
 - High-quality face reconstruction
 - Smooth temporal transitions
 - Professional-grade output encoding
-
-<details>
-<summary>📝 Video Details</summary>
-
-If the video doesn't play directly:
-- View the [raw video file](video_out.mp4)
-- Check the [releases page](../../releases) for sample outputs
-- View on [GitHub Pages](https://tanvigunjal.github.io/LatentSync_VidLab7/video_out.mp4)
-</details>
-
-#### Video Specifications
-- **Resolution**: Maintains input resolution with professional-grade scaling
-- **Frame Rate**: Constant 25 FPS for optimal lip-sync
-- **Codec**: H.264/AVC (libx264) with high profile
-- **Container**: MP4 with fast start optimization
-- **Quality Settings**:
-  - Video: CRF 18 (high quality, visually lossless)
-  - Audio: AAC 192kbps (professional audio quality)
 
 
 #### Sample Command
