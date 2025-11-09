@@ -201,19 +201,6 @@ These improvements focus on stability, performance, and quality enhancements.
    os.makedirs(warmup_dir, exist_ok=True)
    ```
 
-### 2.4 Performance Monitoring
-1. Resource Tracking
-   - Memory usage monitoring
-   - Device utilization tracking
-   - Performance metrics collection
-
-2. Profiling Support
-   - Detailed timing information
-   - Memory allocation tracking
-   - Operation-level profiling
-
-
-
 ## 3. Performance Analysis
 
 ### 3.1 Stage-wise Performance
