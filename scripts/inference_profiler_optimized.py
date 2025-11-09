@@ -83,6 +83,59 @@ class AggressiveModelOptimizer:
         
         return model
 
+class EnhancedSyncOptimizer:
+    def __init__(self, base_guidance_scale=1.0):
+        self.base_guidance_scale = base_guidance_scale
+        self.prev_frame = None
+        self.frame_history = []
+        self.temporal_window = 5
+
+    def calculate_sync_confidence(self, current_frame, audio_features):
+        """Calculate synchronization confidence score."""
+        with torch.no_grad():
+            # Normalize inputs
+            current_frame = torch.nn.functional.normalize(current_frame.flatten())
+            audio_features = torch.nn.functional.normalize(audio_features.flatten())
+            
+            # Calculate cosine similarity
+            confidence = torch.nn.functional.cosine_similarity(
+                current_frame.unsqueeze(0), 
+                audio_features.unsqueeze(0)
+            ).item()
+            
+            return max(0.0, min(1.0, confidence))
+
+    def get_dynamic_guidance_scale(self, current_frame, audio_features):
+        """Adjust guidance scale based on sync confidence."""
+        sync_confidence = self.calculate_sync_confidence(current_frame, audio_features)
+        # Scale between 1.0-2.0 based on confidence
+        guidance_scale = self.base_guidance_scale * (1.0 + 0.5 * (1.0 - sync_confidence))
+        return guidance_scale, sync_confidence
+
+    def apply_temporal_smoothing(self, current_frame):
+        """Apply temporal smoothing between consecutive frames."""
+        if self.prev_frame is not None:
+            # Apply weighted average with previous frame
+            smoothed_frame = 0.8 * current_frame + 0.2 * self.prev_frame
+            
+            # Update frame history
+            self.frame_history.append(current_frame)
+            if len(self.frame_history) > self.temporal_window:
+                self.frame_history.pop(0)
+                
+            # Additional temporal consistency check
+            if len(self.frame_history) >= 3:
+                # Calculate motion smoothness
+                motion_diff = torch.mean(torch.abs(current_frame - self.prev_frame))
+                if motion_diff > 0.5:  # High motion threshold
+                    # Stronger smoothing for high motion
+                    smoothed_frame = 0.7 * current_frame + 0.3 * self.prev_frame
+            
+            current_frame = smoothed_frame
+        
+        self.prev_frame = current_frame.clone()
+        return current_frame
+
 class MemoryOptimizedPipeline:
     def __init__(self, original_pipeline, device, dtype):
         self.pipeline = original_pipeline
@@ -90,6 +143,7 @@ class MemoryOptimizedPipeline:
         self.dtype = dtype
         self.vae_cache = {}
         self.audio_cache = {}
+        self.sync_optimizer = EnhancedSyncOptimizer()
         
     @staticmethod
     def _is_memory_available(required_memory):
